@@ -50,6 +50,33 @@ smoothly, with a blinking caret and working CJK input method.
 
 If (2) is ugly in a webview, we find out now — not in six months.
 
+### Spike A — inline text layout: complete
+
+**[ADR-0002](docs/adr/0002-text-layout-parley.md) holds.** Findings:
+[`u1-docs/docs/spike-a-inline-layout.md`](https://github.com/temidayoxyz/u1-docs/blob/main/docs/spike-a-inline-layout.md)
+
+Measured: 212 system font families discovered; bidi correct; worst-case
+per-paragraph re-layout **54µs**; a visible page re-breaks in **2.66ms against a
+16.7ms frame budget**.
+
+Four requirements came out of it and now shape Phase 1:
+
+| # | Requirement | Why it matters |
+| - | ----------- | -------------- |
+| 1 | Enable `parley/complex-scripts` (not a default feature) and declare `icu_segmenter` directly with `auto` | Without it, CJK and Thai **cannot break lines at all** — no word spaces means no break opportunities |
+| 2 | Ship our own per-script, per-platform fallback policy | Default fallback produced `.notdef` for ordinary Chinese characters. A fallback that silently returns a partial-coverage font is worse than none |
+| 3 | Verify glyph coverage and report gaps | Nothing currently tells the user a document opened with missing glyphs |
+| 4 | Layout must be lazy and cached | Cold layout is 2.58ms/paragraph; only re-break on the typing, resize and scroll paths |
+
+Criterion 1 (layout) is satisfied for the inline layer. The block/flow/page layer
+above it does not exist yet and remains the largest engineering item in U1 Docs.
+
+### Next — Spike B: caret, selection and IME
+
+Answers criteria 2–3 and validates
+[ADR-0003](docs/adr/0003-desktop-ui-stack.md), which stays provisional until it
+does. **The CJK IME is the largest technical risk in the project.**
+
 ---
 
 ## Roadmap
@@ -61,7 +88,13 @@ Risky-assumption validation. Throwaway. See above.
 ### Phase 1 — Core foundations (`u1-docs`)
 
 - `u1-font` — system font enumeration, matching, fallback, cache
+  - **explicit per-script, per-platform fallback policy** (Spike A finding 2)
+  - **coverage verification with gap reporting** (finding 3)
 - `u1-layout` — inline text layout via `parley`, then block/flow/page layout
+  - **incremental by default: re-break cached layouts, never rebuild the
+    document on the typing, resize or scroll path** (finding 4)
+  - `complex-scripts` + `icu_segmenter/auto` are mandatory and test-enforced
+    (finding 1)
 - `u1-doc` — document model: blocks, inlines, formatting, sections
 - Incremental layout: typing stays at 60fps in a 500-page document
 
