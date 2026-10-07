@@ -160,13 +160,37 @@ Risky-assumption validation. Throwaway. See above.
 
 ### Phase 2 — OOXML (`u1-docs`)
 
-- OPC container layer (`zip` + relationships + content types)
-- WordprocessingML reader producing **model + preserved original tree**
-- Writer that splices edits back into the preserved tree — lossless
-- Headers/footers, sections, page setup, styles, numbering, tables
+- ✅ OPC container layer (`zip` + relationships + content types) — **done**
+- ✅ Lossless XML tree (hand-written; preserves bytes, not just meaning) — **done**
+- ⬜ WordprocessingML semantics: paragraphs, runs, styles, numbering, tables
+- ⬜ Headers/footers, sections, page setup
+- ⬜ Writer that splices edits back into the preserved tree
 
 See [ADR-0005](docs/adr/0005-ooxml-lossless-layer.md). The lossless property is
 non-negotiable; it is what stops us corrupting user files.
+
+#### What Phase 2 step 1 established
+
+`u1-docs` opens a real `.docx`. A document opened and saved with no edits comes
+back with **every part byte-for-byte identical**, and repeated round trips are
+idempotent — 12 tests, stable across runs.
+
+The bar is byte-identity rather than semantic equivalence on purpose. Re-serialising
+XML "canonically" changes bytes without changing meaning, and the moment Word
+meets something it does not recognise it silently repairs the file on the user's
+next save. So the XML tree keeps each node's original source text and reproduces
+it: attribute order, quote style, whitespace, comments, CDATA and namespace
+prefixes all survive.
+
+Round-trip tests were written **before** the implementation, so the requirement
+is stated independently. A test written afterwards tends to assert whatever the
+reader happens to do, which is how a lossy implementation gets certified as
+correct.
+
+Still missing, and it is the substantive part: WordprocessingML *semantics* —
+paragraphs, runs, styles, numbering, tables. The container and the tree had to be
+exactly right first, because everything above assumes a round trip does not touch
+what it did not edit.
 
 ### Phase 3 — Editing surface (`u1-docs`)
 
