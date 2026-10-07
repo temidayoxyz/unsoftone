@@ -71,11 +71,38 @@ Four requirements came out of it and now shape Phase 1:
 Criterion 1 (layout) is satisfied for the inline layer. The block/flow/page layer
 above it does not exist yet and remains the largest engineering item in U1 Docs.
 
-### Next — Spike B: caret, selection and IME
+### Spike B — caret, hit testing, IME: criterion 2 done, criterion 3 not testable here
 
-Answers criteria 2–3 and validates
-[ADR-0003](docs/adr/0003-desktop-ui-stack.md), which stays provisional until it
-does. **The CJK IME is the largest technical risk in the project.**
+Findings: [`u1-docs/docs/spike-b-caret-and-ime.md`](https://github.com/temidayoxyz/u1-docs/blob/main/docs/spike-b-caret-and-ime.md)
+
+**Criterion 2 (caret, selection, navigation) passes.** Caret geometry, hit
+testing and arrow-key navigation through mixed-direction text are verified
+across all 12 corpus samples, and every conclusion is enforced by tests. Bidi is
+correct: in RTL text the caret's logical start sits on the *right* of its logical
+end, which is what makes typing land where the user expects.
+
+**Criterion 3 (CJK IME) was NOT verified.** This machine has no input method
+registered — no CTF TIP entries, US English keyboard layout only — so composing
+Japanese is impossible by construction. Everything the IME *depends on* is
+confirmed (anchor rects at every position, safe insertion offsets, geometry
+stable across re-break). What remains unproven is whether a webview delivers
+correct composition, and that can only be settled by hand. An 8-step protocol is
+in the findings doc.
+
+Three findings, all of which change Phase 1:
+
+| # | Requirement | Why |
+| - | ----------- | --- |
+| 1 | `u1-layout` needs a line-offset table (prefix sums), not per-query scanning | `LineMetrics.offset` is a *horizontal* alignment offset. Reading it as y made vertical navigation a silent no-op: every line reported y=0, so Up/Down did nothing, with no error |
+| 2 | **Grapheme segmentation via `unicode-segmentation` is mandatory** before any insertion ships | parley clusters are per-*codepoint*: `e` + combining accent is 2 clusters. A caret walk over raw cluster edges puts a stop inside a visible character, and typing there orphans the mark |
+| 3 | Caret geometry is a first-class layout output, not a rendering concern | it is what the IME anchor consumes, so it cannot live in the shell |
+
+Finding 2 has a **known gap recorded as a deliberately failing test**: a GB9
+filter cannot express UAX #29 GB11, so a ZWJ family emoji still yields 4 caret
+stops instead of 2. It cannot be forgotten while it fails.
+
+**ADR-0003 remains provisional.** Its geometry claim is now supported; its
+webview claim is untested.
 
 ---
 
@@ -88,13 +115,20 @@ Risky-assumption validation. Throwaway. See above.
 ### Phase 1 — Core foundations (`u1-docs`)
 
 - `u1-font` — system font enumeration, matching, fallback, cache
-  - **explicit per-script, per-platform fallback policy** (Spike A finding 2)
+  - **explicit per-script, per-platform fallback policy** (Spike A finding 3)
   - **coverage verification with gap reporting** (finding 3)
 - `u1-layout` — inline text layout via `parley`, then block/flow/page layout
   - **incremental by default: re-break cached layouts, never rebuild the
-    document on the typing, resize or scroll path** (finding 4)
+    document on the typing, resize or scroll path** (Spike A finding 4)
   - `complex-scripts` + `icu_segmenter/auto` are mandatory and test-enforced
-    (finding 1)
+    (Spike A finding 1)
+  - **line-offset table via prefix sums**, not per-query scanning
+    (Spike B finding 1)
+  - **grapheme segmentation via `unicode-segmentation`**, mandatory before any
+    insertion path ships; parley clusters are per-codepoint and a caret stop
+    inside a combining sequence produces mojibake (Spike B finding 2)
+  - **caret geometry is a first-class layout output**, consumed by the IME
+    anchor — not a rendering concern (Spike B finding 3)
 - `u1-doc` — document model: blocks, inlines, formatting, sections
 - Incremental layout: typing stays at 60fps in a 500-page document
 
