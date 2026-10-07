@@ -1,0 +1,23 @@
+# Product repositories.
+#
+# Each U1 product is an INDEPENDENT Git repository with its own history,
+# releases and lifecycle. This meta-repository tracks ecosystem-level
+# documentation only and must never manage product source code.
+#
+# See docs/adr/0004-repository-model.md
+/U1Docs/
+/U1Sheets/
+/U1Slides/
+/U1Notes/
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor noise
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
