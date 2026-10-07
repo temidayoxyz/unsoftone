@@ -97,12 +97,38 @@ Three findings, all of which change Phase 1:
 | 2 | **Grapheme segmentation via `unicode-segmentation` is mandatory** before any insertion ships | parley clusters are per-*codepoint*: `e` + combining accent is 2 clusters. A caret walk over raw cluster edges puts a stop inside a visible character, and typing there orphans the mark |
 | 3 | Caret geometry is a first-class layout output, not a rendering concern | it is what the IME anchor consumes, so it cannot live in the shell |
 
-Finding 2 has a **known gap recorded as a deliberately failing test**: a GB9
-filter cannot express UAX #29 GB11, so a ZWJ family emoji still yields 4 caret
-stops instead of 2. It cannot be forgotten while it fails.
+All three are **now implemented**. Spike B is 16/16 and exits zero:
 
-**ADR-0003 remains provisional.** Its geometry claim is now supported; its
-webview claim is untested.
+- `CaretMap::line_tops` — prefix-sum table, O(1) lookup, invalidated on rebreak
+- `CaretMap::grapheme_caret_positions` — real UAX #29 via `unicode-segmentation`.
+  A ZWJ family emoji went from 4 caret stops to 2; the deliberately-failing GB11
+  check is now a passing one, so it cannot be quietly closed by weakening the
+  assertion
+- `CaretMap` is a public library type, so caret geometry is a layout output by
+  construction
+
+### The IME protocol is now runnable
+
+```bash
+cargo run -p ime-protocol
+```
+
+Opens a window with three samples (ASCII, Arabic-inside-English, Chinese), a live
+composition event log, and the 8 steps on screen. Every caret position and anchor
+coordinate is computed by the Rust layout engine and injected as plain numbers —
+the page never asks the browser where anything is. That is ADR-0003's entire bet,
+made inspectable.
+
+The harness is a **separate workspace crate** (`spikes/ime-protocol`), not a
+feature flag. A feature flag looked equivalent and was not: `cargo
+clippy --all-features` in the default CI job switched the webview back on, so
+`u1-docs` stopped being webview-free in practice while still appearing to be. A
+separate crate makes the boundary structural, and CI now asserts it.
+
+**Criterion 3 is still open** — only a human with a CJK IME can close it. But it
+now takes about five minutes instead of requiring a build first.
+
+**ADR-0003 remains provisional** until the protocol is run and steps 3 and 4 pass.
 
 ---
 
